@@ -36,7 +36,7 @@ Docker通过隔离机制，可以将服务器利用到极致！
 
 2010年，几个的年轻人，就在美国成立了一家公司 dotcloud
 
-做一些pass的云计算服务！LXC（Linux Container容器）有关的容器技术！
+做一些paas的云计算服务！LXC（Linux Container容器）有关的容器技术！
 
 Linux Container容器是一种内核虚拟化技术，可以提供轻量级的虚拟化，以便隔离进程和资源。他们将自己的技术（容器化技术）命名就是 Docker。
 
@@ -205,17 +205,16 @@ root@Tj129qi:~# docker run -it centos /bin/bash
 bin  dev  etc  home  lib  lib64  lost+found  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
 [root@c86ed7ef9553 /]# exit  # 退出容器命令
 exit
-root@Tj129qi:~#
 ```
 
 **列出所有运行的容器**
 
 ```shell
 # docker ps 命令
-	#列出当前正在运行的容器
--a # 列出当前正在运行的容器+带出历史运行过的容器
--n=？ #显示最近创建的容器
--q #只显示容器的编号
+	  #列出当前正在运行的容器
+-a    #列出当前正在运行的容器+带出历史运行过的容器
+-n=？  #显示最近创建的容器
+-q    #只显示容器的编号
 root@Tj129qi:~# docker ps -a
 CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS                          PORTS               NAMES
 c86ed7ef9553        centos              "/bin/bash"         3 minutes ago       Exited (0) About a minute ago                       clever_lichterman
@@ -697,33 +696,6 @@ docker run -d --name elasticsearch -p 9200:9200 -p 9300:9300 -e
 }
 # 查看docker容器使用内存情况（每秒刷新，也挺耗内存的一个命令）
 ➜ ~ docker stats
-作业：使用kibana连接es？思考网络如何才能连接。
-Docker可视化
-什么是portainer？
-Docker图形化界面管理工具！提供一个后台面板供我们操作！
-#关闭，添加内存的限制，修改配置文件 -e 环境配置修改
-➜ ~ docker rm -f d73ad2f22dd3                        
-➜ ~ docker run -d --name elasticsearch -p 9200:9200 -p 9300:9300 -e
-"discovery.type=single-node" -e ES_JAVA_OPTS="-Xms64m -Xmx512m"
-elasticsearch:7.6.2
-➜ ~ curl localhost:9200
-{
- "name" : "b72c9847ec48",
- "cluster_name" : "docker-cluster",
- "cluster_uuid" : "yNAK0EORSvq3Wtaqe2QqAg",
- "version" : {
-  "number" : "7.6.2",
-  "build_flavor" : "default",
-  "build_type" : "docker",
-  "build_hash" : "ef48eb35cf30adf4db14086e8aabd07ef6fb113f",
-  "build_date" : "2020-03-26T06:34:37.794943Z",
-  "build_snapshot" : false,
-  "lucene_version" : "8.4.0",
-  "minimum_wire_compatibility_version" : "6.8.0",
-  "minimum_index_compatibility_version" : "6.0.0-beta1"
-},
- "tagline" : "You Know, for Search"
-}
 ```
 
 作业：使用kibana连接es？思考网络如何才能连接。
@@ -800,8 +772,8 @@ docker exec -it 容器id
 docker cp -r webapps.dist/* webapps
 # 4、将操作过的容器通过commit调教为一个镜像！我们以后就使用我们修改过的镜像即可，这就是我们自己
 的一个修改的镜像。
-docker commit -a="作者" -m="描述信息" 容器id 目标镜像名:[TAG]
-docker commit -a="kuangshen" -m="add webapps app" 容器id tomcat02:1.0
+# docker commit -a="作者" -m="描述信息" 容器id 目标镜像名:[TAG]
+docker commit -a="niuniu" -m="add webapps app" 容器id tomcat02:1.0
 ```
 
 如果你想要保存当前容器的状态，就可以通过commit来提交，获得一个镜像，就好比我们我们使用虚拟机的快照。
@@ -940,4 +912,203 @@ docker run -d -P --name nginx05 -v juming:/etc/nginx:ro nginx
 docker run -d -P --name nginx05 -v juming:/etc/nginx:rw nginx
 # ro 只要看到ro就说明这个路径只能通过宿主机来操作，容器内部是无法操作！
 ```
+
+### 七、DockerFile
+
+#### 1.  DockerFile介绍
+
+dockerfile是用来构建docker镜像的文件！
+
+构建步骤：
+
+1、编写一个dockerfile文件
+
+2、dockerbuild构建成为一个镜像
+
+3、docker run 运行镜像
+
+4、docker push发布镜像（DockerHub、阿里云仓库）
+
+但是很多官方镜像都是基础包，很多功能都没有，需要自己搭建镜像！
+
+#### 2. DockerFile构建过程
+
+基础知识：
+
+1、每个保留关键字（指令）都必须是大写字母
+
+2、执行从上到下顺序
+
+3、#表示注释
+
+4、每一个指令都会创建提交一个新的镜像，并提交
+
+![image-20201103170614751](upload/image-20201103170614751.png)
+
+DockerFile是面向开发的，我们以后发布项目，做镜像，就要编写dockerfile文件
+
+DockerFile：构建文件，定义了一切的步骤，源代码
+
+DockerImages：通过DockerFile构建生成的镜像，最终发布和运行产品。
+
+Docker容器：容器就是镜像运行起来提供服务。
+
+```shell
+#DockerFile常用指令
+FROM		# 基础镜像，一切从这里开始构建
+MAINTAINER  # 镜像作者，姓名+邮箱
+RUN			# 镜像构建的时候需要运行的命令
+ADD			# 步骤，tomcat镜像，这个是tomcat压缩包！添加内容 添加目录
+WORKDIR		# 镜像的工作目录
+VOLUME		# 挂载的目录
+EXPOSE		# 保留端口配置
+CMD			# 指定这个容器启动的时候要运行的命令，只有最后一个会生效，可被替代。
+ENTRYPOINT	# 指定这个容器启动的时候要运行的命令，可以追加命令
+ONBUILD		# 当构建一个被继承DockerFile这个时候就会运行ONBUILD的指令，触发指令。
+COPY		# 类似ADD ，将我们文件拷贝到镜像中
+ENV			# 构建的时候设置环境变量
+```
+
+![img](http://markdown.xiaonainiu.top/img/6870990-744e06b25e051ac7.png)
+
+#### 3. 实战测试
+
+创建一个自己的centos
+
+```shell
+ #编写DockerFile文件
+ vim mydockerfile-centos
+ 
+ FROM centos
+ MAINTAINER niu<47921896@qq.com>
+ ENV MYPATH /usr/local
+ WORKDIR $MYPATH
+ 
+ RUN yum -y install vim
+ RUN yum -y install net-tools
+ 
+ EXPOSE 80
+ 
+ CMD echo $MYPATH
+ CMD echo "----end-----"
+ CMD /bin/bash
+```
+
+2. 通过这个文件构建镜像
+
+```shell
+docker build -f mydockerfile-centos -t mycentos:0.1 .
+```
+
+![image-20201103210757027](upload/image-20201103210757027.png)
+
+![image-20201103210932584](upload/image-20201103210932584.png)
+
+**运行**
+
+```shell
+root@Tj129qi:/home/dockerfile# docker run -it 7319a2c1ba04
+
+#查看当前目录发现是 上述设置的工作目录
+[root@285087a7388b local]# pwd
+/usr/local
+```
+
+**CMD 和 ENTRYPOINT区**别
+
+测试CMD
+
+```shell
+# 编写dockerfile文件
+$ vim dockerfile-test-cmd
+FROM centos
+CMD ["ls","-a"]
+# 构建镜像
+$ docker build  -f dockerfile-test-cmd -t cmd-test:0.1 .
+# 运行镜像
+$ docker run cmd-test:0.1
+.
+..
+.dockerenv
+测试ENTRYPOINT
+Dockerfile中很多命令都十分的相似，我们需要了解它们的区别，我们最好的学习就是对比他们然后测
+试效果！
+4.实战：Tomcat镜像
+1、准备镜像文件
+准备tomcat 和 jdk到当前目录，编写好README 。
+2、编写dokerfile
+bin
+dev
+# 想追加一个命令 -l 成为ls -al
+$ docker run cmd-test:0.1 -l
+docker: Error response from daemon: OCI runtime create failed:
+container_linux.go:349: starting container process caused "exec: \"-l\":
+executable file not found in $PATH": unknown.
+ERRO[0000] error waiting for container: context canceled
+# cmd的情况下 -l 替换了CMD["ls","-l"]。 -l 不是命令所有报错
+```
+
+测试ENTRYPOINT
+
+```shell
+# 编写dockerfile文件
+$ vim dockerfile-test-entrypoint
+FROM centos
+ENTRYPOINT ["ls","-a"]
+$ docker run entrypoint-test:0.1
+.
+..
+.dockerenv
+bin
+dev
+etc
+home
+lib
+lib64
+lost+found ...
+# 我们的命令，是直接拼接在我们得ENTRYPOINT命令后面的
+$ docker run entrypoint-test:0.1 -l
+total 56
+drwxr-xr-x  1 root root 4096 May 16 06:32 .
+drwxr-xr-x  1 root root 4096 May 16 06:32 ..
+-rwxr-xr-x  1 root root   0 May 16 06:32 .dockerenv
+lrwxrwxrwx  1 root root   7 May 11  2019 bin -> usr/bin
+drwxr-xr-x  5 root root  340 May 16 06:32 dev
+drwxr-xr-x  1 root root 4096 May 16 06:32 etc
+drwxr-xr-x  2 root root 4096 May 11  2019 home
+lrwxrwxrwx  1 root root   7 May 11  2019 lib -> usr/lib
+lrwxrwxrwx  1 root root   9 May 11  2019 lib64 -> usr/lib64 ....
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
