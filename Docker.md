@@ -1080,9 +1080,329 @@ lrwxrwxrwx  1 root root   7 May 11  2019 lib -> usr/lib
 lrwxrwxrwx  1 root root   9 May 11  2019 lib64 -> usr/lib64 ....
 ```
 
+#### 4. 实战：tomcat镜像
+
+1、准备镜像文件
+
+![image-20201104201027307](C:/Users/hp/Desktop/Interview/upload/image-20201104201027307.png)
+
+2、创建readme.txt
+
+3、编写Dockerfile
+
+```shell
+FROM centos
+MAINTAINER niu<47921897@qq.com>	#作者信息
+
+COPY readme.txt /usr/local/readme.txt
+#	解压镜像
+ADD jdk-8u212-linux-x64.tar.gz /usr/local/
+ADD apache-tomcat-8.5.59.tar.gz /usr/local/
+#	安装镜像
+RUN yum -y install vim
+#	配置环境
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+ENV JAVA_HOME /usr/local/jdk1.8.0_212
+ENV CATALINA_HOME /usr/local/apache-tomcat-8.5.59
+ENV PATH $PATH:$JAVA_HOME/bin:$CATALINA_HOME/lib
+EXPOSE 3344		#暴漏端口
+CMD /usr/local/apache-tomcat-8.5.59/bin/startup.sh && tail -F /usr/local/apache-tomcat-8.5.59/logs/catalina.out
+
+```
+
+4、构建镜像
+
+```shell
+# 因为Dockerfile命名使用默认命名，因此不用使用-f指定文件
+docker build -t mytomcat:0.1 .
+```
+
+5、run镜像
+
+```shell
+root@Tj129qi:~# docker run -d -p 3344:8080 --name tomcat02 -v /home/ntj/build/tomcat/test:/usr/apache-tomcat-8.5.59/webapps/test -v /home/ntj/build/tomcat/tomcatlogs/:/usr/local/apache-tomcat-8.5.59/logs ec13acee0ab3
+
+```
+
+6、访问测试
+
+![image-20201104201814444](C:/Users/hp/Desktop/Interview/upload/image-20201104201814444.png)
+
+7、发布项目
+
+由于做了卷挂载，直接在linux上的文件夹添加即可
+
+#### 5. 上传镜像
+
+1、注册 http://dockerhub.com
+
+2、在docker登录
+
+```shell
+docker login -u XXXX
+# 给镜像 tag  /之前与登陆账号名字保持一致
+docker tag ec13acee0ab3 dynamicboboo/mytomcat:2.0
+# 提交
+docker push dynaminboboo/mytomcat
+```
+
+![image-20201104233503103](upload/image-20201104233503103.png)
+
+七、Docker网络
+
+理解Docker0
+
+清空所有镜像
+
+> 测试
+
+![image-20201106095721915](upload/image-20201106095721915.png)
 
 
 
+### 八、Docker网络
+
+#### 1.  理解Docker 0
+
+![image-20201107094941861](upload/image-20201107094941861.png)
+
+小结： Docker使用的是Linux的桥接，宿主机是一个Docker容器的网桥 docker0
+
+#### 2. –link
+
+```shell
+$ docker exec -it tomcat02 ping tomca01  # ping不通
+ping: tomca01: Name or service not known
+# 运行一个tomcat03 --link tomcat02
+$ docker run -d -P --name tomcat03 --link tomcat02 tomcat
+5f9331566980a9e92bc54681caaac14e9fc993f14ad13d98534026c08c0a9aef
+# 用tomcat03 ping tomcat02 可以ping通
+$ docker exec -it tomcat03 ping tomcat02
+PING tomcat02 (172.17.0.3) 56(84) bytes of data.
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=1 ttl=64 time=0.115 ms
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=2 ttl=64 time=0.080 ms
+# 用tomcat02 ping tomcat03 ping不通
+```
+
+> docker inspect tomcat03
+
+![image-20201107095129683](upload/image-20201107095129683.png)
+
+查看tomcat03里面的/etc/hosts发现有tomcat02的配置
+
+–link 本质就是在hosts配置中添加映射
+
+现在使用Docker已经不建议使用–link了！
+
+自定义网络，不适用docker0！
+
+docker0问题：不支持容器名连接访问！
+
+#### 3. 自定义网络
+
+```shell
+docker network
+connect   -- Connect a container to a network
+create    -- Creates a new network with a name specified by the
+disconnect  -- Disconnects a container from a network
+inspect   -- Displays detailed information on a network
+ls      -- Lists all the networks created by the user
+prune    -- Remove all unused networks
+rm      -- Deletes one or more networks
+```
+
+**网络模式**
+
+bridge ：桥接 docker（默认，自己创建也是用bridge模式）
+
+none ：不配置网络，一般不用
+
+host ：和所主机共享网络
+
+container ：容器网络连通（用得少！局限很大）
+
+**测试**
+
+```shell
+# 我们直接启动的命令 --net bridge,而这个就是我们得docker0
+# bridge就是docker0
+$ docker run -d -P --name tomcat01 tomcat
+等价于 => docker run -d -P --name tomcat01 --net bridge tomcat
+# docker0，特点：默认，域名不能访问。 --link可以打通连接，但是很麻烦！
+# 我们可以 自定义一个网络
+$ docker network create --driver bridge --subnet 192.168.0.0/16 --gateway
+192.168.0.1 mynet
+```
+
+![image-20201107095334739](upload/image-20201107095334739.png)
+
+> $ docker network inspect mynet;
+
+![image-20201107095350868](upload/image-20201107095350868.png)
+
+启动两个tomcat,再次查看网络情况
+
+![image-20201107095446912](upload/image-20201107095446912.png)
+
+![image-20201107095452634](upload/image-20201107095452634.png)
+
+在自定义的网络下，服务可以互相ping通，不用使用–link
+
+![image-20201107095507611](upload/image-20201107095507611.png)
+
+我们自定义的网络docker当我们维护好了对应的关系，推荐我们平时这样使用网络！
+
+redis -不同的集群使用不同的网络，保证集群是安全和健康的
+
+mysql-不同的集群使用不同的网络，保证集群是安全和健康的
+
+![image-20201107095533526](upload/image-20201107095533526.png)
+
+#### 4. 网络连通
+
+![image-20201107100050399](upload/image-20201107100050399.png)
+
+![image-20201107100054956](upload/image-20201107100054956.png)
+
+```shell
+# 测试两个不同的网络连通 再启动两个tomcat 使用默认网络，即docker0
+$ docker run -d -P --name tomcat01 tomcat
+$ docker run -d -P --name tomcat02 tomcat
+# 此时ping不通
+```
+
+要将tomcat01 连通 tomcat—net-01 ，连通就是将 tomcat01加到 mynet网络一个容器两个ip（tomcat01）
+
+![image-20201107100126233](upload/image-20201107100126233.png)
+
+01连通 ，加入后此时，已经可以tomcat01 和 tomcat-01-net ping通了
+
+02是依旧不通的
+
+**结论：假设要跨网络操作别人，就需要使用docker network connect 连通！**
+
+#### 5. 实战：部署Redis集群
+
+![image-20201107100203362](upload/image-20201107100203362.png)
+
+```shell
+# 1 创建网卡
+docker network create redis --subnet 172.38.0.0/16
+# 2 通过脚本创建六个redis配置
+for port in $(seq 1 6);\
+do \
+mkdir -p /mydata/redis/node-${port}/conf
+touch /mydata/redis/node-${port}/conf/redis.conf
+cat << EOF >> /mydata/redis/node-${port}/conf/redis.conf
+port 6379
+bind 0.0.0.0
+cluster-enabled yes
+cluster-config-file nodes.conf
+cluster-node-timeout 5000
+cluster-announce-ip 172.38.0.1${port}
+cluster-announce-port 6379
+cluster-announce-bus-port 16379
+appendonly yes
+EOF
+done
+# 3 运行redis
+docker run -p 6371:6379 -p 16671:16379 --name redis-1 -v /mydata/redis/node-1/data:/data -v /mydata/redis/node-1/conf/redis.conf:/etc/redis/redis.conf -d --net redis --ip 172.38.0.11 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+
+docker run -p 6372:6379 -p 16672:16379 --name redis-2 \
+> -v /mydata/redis/node-2/data:/data \
+> -v /mydata/redis/node-2/conf/redis.conf:/etc/redis/redis.conf \
+> -d --net redis --ip 172.38.0.12 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+docker run -p 6373:6379 -p 16673:16379 --name redis-3 \
+> -v /mydata/redis/node-3/data:/data \
+> -v /mydata/redis/node-3/conf/redis.conf:/etc/redis/redis.conf \
+> -d --net redis --ip 172.38.0.13 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+
+docker run -p 6374:6379 -p 16674:16379 --name redis-4 \
+> -v /mydata/redis/node-4/data:/data \
+> -v /mydata/redis/node-4/conf/redis.conf:/etc/redis/redis.conf \
+> -d --net redis --ip 172.38.0.14 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+
+docker run -p 6375:6379 -p 16675:16379 --name redis-5 \
+> -v /mydata/redis/node-5/data:/data \
+> -v /mydata/redis/node-5/conf/redis.conf:/etc/redis/redis.conf \
+> -d --net redis --ip 172.38.0.15 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+
+docker run -p 6376:6379 -p 16676:16379 --name redis-6 \
+> -v /mydata/redis/node-6/data:/data \
+> -v /mydata/redis/node-6/conf/redis.conf:/etc/redis/redis.conf \
+> -d --net redis --ip 172.38.0.16 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+# 进入一个redis
+docker exec -it redis-1 /bin/sh #redis默认没有bash
+
+# 开启集群
+redis-cli --cluster create 172.38.0.11:6379 172.38.0.12:6379 172.38.0.13:6379 172.38.0.14:6379 172.38
+.0.15:6379 172.38.0.16:6379 --cluster-replicas 1
+```
+
+![image-20201107100922790](upload/image-20201107100922790.png)
+
+**测试**
+
+![image-20201107101031726](upload/image-20201107101031726.png)
+
+关闭redis-3
+
+再次查询成功。
+
+### 九、springboot项目打包镜像Docker镜像
+
+1、spring boot工程
+
+```java
+@RestController
+public class HelloControll {
+    @RequestMapping("/hello")
+    public String hell(){
+        return"hello,ntj";
+    }
+}
+```
+
+2、创建Dockerfile文件
+
+```shell
+FROM java:8
+COPY *.jar /app.jar
+CMD ["--server port 8080"]
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","/app.jar"]
+```
+
+3、将项目打成jar包 同Dockerfile上传到服务器
+
+4、构建镜像
+
+```shell
+docker build -t niu666 .
+```
+
+5、运行容器
+
+```shell
+docker run -d -P --name ntj-spring-web niu666
+```
+
+测试访问
+
+> curl localhost:32768/hello
+
+![image-20201107105952795](upload/image-20201107105952795.png)
+
+测试成功！
+
+至此Docker基础阶段已经结束！
 
 
 
